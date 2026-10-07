@@ -357,7 +357,7 @@ class StorageService {
 
 		if (!file || !metadata) return null;
 
-		// OPFS loses the original filename and MIME type ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â reconstruct from metadata
+		// OPFS loses the original filename and MIME type — reconstruct from metadata
 		const restoredFile =
 			file.name === metadata.name && file.type
 				? file

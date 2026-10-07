@@ -30,9 +30,9 @@ class Settings(BaseSettings):
     AI_MEMORY_BUDGET: str = "auto"  # "auto", "4GB", "8GB", "16GB", "32GB"
     AI_MODEL_TIER: str = "auto"  # "lite", "standard", "pro", "auto"
     AI_LLM_BACKEND: str = "auto"  # "ollama", "turboquant", "auto" (TQ with KV-cache optimization when available, else Ollama)
-    KV_CACHE_BITS: int = 2  # 2, 3, or 4 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â TurboQuant KV cache quantization bits (2 = most memory efficient, default)
+    KV_CACHE_BITS: int = 2  # 2, 3, or 4 — TurboQuant KV cache quantization bits (2 = most memory efficient, default)
     # Compute mode for the TurboQuant inference service.
-    # "auto" = detect CUDA ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ MPS ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ CPU; "cuda" = force GPU; "cpu" = force CPU.
+    # "auto" = detect CUDA → MPS → CPU; "cuda" = force GPU; "cpu" = force CPU.
     # Propagated to turboquant-service as its DEVICE env var.
     AI_COMPUTE_MODE: str = "auto"
 
@@ -43,9 +43,9 @@ class Settings(BaseSettings):
     SPEAKER_SERVICE_URL: str = "http://localhost:8424"
     FACE_SERVICE_URL: str = "http://localhost:8425"
     TURBOQUANT_SERVICE_URL: str = "http://localhost:8430"
-    # CLIP embedding service ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â powers privacy-first semantic media search
+    # CLIP embedding service — powers privacy-first semantic media search
     CLIP_SERVICE_URL: str = "http://localhost:8426"
-    # NLLB-200 translation service ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â fully-local, privacy-first. Powers AI dubbing.
+    # NLLB-200 translation service — fully-local, privacy-first. Powers AI dubbing.
     TRANSLATE_SERVICE_URL: str = "http://localhost:8427"
 
     # Gemini Transcription
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     SARVAM_API_KEY: str = ""
     SARVAM_API_BASE_URL: str = "https://api.sarvam.ai"
 
-    # Smallest AI (Waves ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Lightning TTS + Pulse STT)
+    # Smallest AI (Waves — Lightning TTS + Pulse STT)
     SMALLEST_API_KEY: str = ""
     SMALLEST_API_BASE_URL: str = "https://api.smallest.ai/waves/v1"
 

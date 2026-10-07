@@ -355,7 +355,7 @@ export function QuickActionsBar({ className }: { className?: string }) {
 	const handleFindClips = useCallback(() => {
 		useAssetsPanelStore.getState().setActiveTab("audio");
 		toast.info(
-			"Switched to Audio panel Ã¢â‚¬â€ use the Podcast tab to find best clips.",
+			"Switched to Audio panel — use the Podcast tab to find best clips.",
 		);
 		setFindClipsStatus("done");
 	}, []);
@@ -440,7 +440,7 @@ export function QuickActionsBar({ className }: { className?: string }) {
 						: "Find fillers",
 			description:
 				fillerStatus === "done" && effectiveFillerCount > 0
-					? `${effectiveFillerCount} filler words found Ã¢â‚¬â€ click to remove`
+					? `${effectiveFillerCount} filler words found — click to remove`
 					: currentFillerCount > 0
 						? `${currentFillerCount} filler words detected`
 						: "Scan for filler words (um, uh, like...)",
@@ -485,8 +485,8 @@ export function QuickActionsBar({ className }: { className?: string }) {
 			label: popoverSubCount > 0 ? "Add more subs" : "Popover subs",
 			description:
 				popoverSubCount > 0
-					? `${popoverSubCount} set${popoverSubCount > 1 ? "s" : ""} added Ã¢â‚¬â€ click to add another layer`
-					: "Word-by-word popover subtitles Ã¢â‚¬â€ each word appears when spoken and stays visible",
+					? `${popoverSubCount} set${popoverSubCount > 1 ? "s" : ""} added — click to add another layer`
+					: "Word-by-word popover subtitles — each word appears when spoken and stays visible",
 			icon: ClosedCaptionIcon,
 			count: popoverSubCount > 0 ? popoverSubCount : undefined,
 			status: popoverSubStatus,
