@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routes import analyze, audio, background, broll, command, dub, engagement, export, factcheck, generate, llm, podcast, sarvam, search, setup, smallest, template, transcribe, transcribe_ws, translate, tts, turboquant, video, youtube
+from app.routes import eenoki, analyze, audio, background, broll, command, dub, engagement, export, factcheck, generate, llm, podcast, sarvam, search, setup, smallest, template, transcribe, transcribe_ws, translate, tts, turboquant, video, youtube
 
 # Configure logging
 logging.basicConfig(
@@ -101,93 +101,64 @@ app.include_router(translate.router)
 app.include_router(dub.router)
 app.include_router(background.router)
 app.include_router(broll.router)
+app.include_router(eenoki.router)
 
 
 @app.get("/health")
 async def health() -> dict:
-    """Health check endpoint.
-
-    Checks downstream microservices and returns aggregated status
-    so the frontend has everything it needs in one call.
-    """
+    import asyncio
     import httpx
+    import psutil
 
-    # Check which microservices are online
-    online_services: list[str] = []
-
-    async def _ping(name: str, url: str) -> None:
+    def check_url(name: str, url: str):
         try:
-            async with httpx.AsyncClient(timeout=3) as client:
-                resp = await client.get(f"{url}/health")
-                if resp.status_code == 200:
-                    online_services.append(name)
+            with httpx.Client(timeout=5) as client:
+                r = client.get(url)
+                if r.status_code == 200:
+                    return name, True, r
         except Exception:
             pass
+        return name, False, None
 
-    # Check Ollama models
-    ollama_models: list[str] = []
-    try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            resp = await client.get(f"{settings.OLLAMA_URL}/api/tags")
-            if resp.status_code == 200:
-                online_services.append("ollama")
-                data = resp.json()
-                ollama_models = [m.get("name", "") for m in data.get("models", [])]
-    except Exception:
-        pass
+    checks = [
+        ("ollama", f"{settings.OLLAMA_URL}/api/tags"),
+        ("whisper", f"{settings.WHISPER_SERVICE_URL}/health"),
+        ("clip", f"{settings.CLIP_SERVICE_URL}/health"),
+    ]
 
-    import asyncio
-    await asyncio.gather(
-        _ping("whisper", settings.WHISPER_SERVICE_URL),
-        _ping("tts", settings.TTS_SERVICE_URL),
-        _ping("image", settings.IMAGE_SERVICE_URL),
-        _ping("speaker", settings.SPEAKER_SERVICE_URL),
-        _ping("face", settings.FACE_SERVICE_URL),
-        _ping("turboquant", settings.TURBOQUANT_SERVICE_URL),
-        _ping("clip", settings.CLIP_SERVICE_URL),
-        _ping("translate", settings.TRANSLATE_SERVICE_URL),
+    results = await asyncio.gather(
+        *[asyncio.to_thread(check_url, name, url) for name, url in checks]
     )
 
-    # System RAM via psutil
-    ram_info = None
-    try:
-        import psutil
-        mem = psutil.virtual_memory()
-        ram_info = {
-            "usedMb": round(mem.used / 1024 / 1024),
-            "totalMb": round(mem.total / 1024 / 1024),
-            "percent": mem.percent,
-        }
-    except ImportError:
-        pass
+    services = []
+    models = []
 
-    # GPU VRAM via torch
-    gpu_available = False
-    gpu_info = None
-    try:
-        import torch
-        gpu_available = torch.cuda.is_available()
-        if gpu_available:
-            device = torch.cuda.current_device()
-            gpu_info = {
-                "usedMb": round(torch.cuda.memory_allocated(device) / 1024 / 1024),
-                "totalMb": round(torch.cuda.get_device_properties(device).total_mem / 1024 / 1024),
-            }
-    except ImportError:
-        pass
+    for name, ok, resp in results:
+        if ok:
+            services.append(name)
+            if name == "ollama" and resp is not None:
+                try:
+                    models = [m.get("name", "") for m in resp.json().get("models", [])]
+                except Exception:
+                    pass
+
+    mem = psutil.virtual_memory()
 
     return {
         "available": True,
-        "models": ollama_models,
-        "services": online_services,
-        "gpuAvailable": gpu_available,
+        "models": models,
+        "services": services,
+        "gpuAvailable": False,
         "memoryUsage": {
-            "ram": ram_info,
-            "gpu": gpu_info,
+            "ram": {
+                "usedMb": round(mem.used / 1024 / 1024),
+                "totalMb": round(mem.total / 1024 / 1024),
+                "percent": mem.percent,
+            },
+            "gpu": None,
         },
         "version": "0.1.0",
     }
-
 
 @app.get("/services/health")
 async def services_health() -> dict:

@@ -4,6 +4,7 @@ Proxies transcription requests to the whisper-service microservice.
 Subtitle generation remains local (no heavy dependencies).
 """
 
+import asyncio
 import logging
 
 import httpx
@@ -11,6 +12,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.services.gemini_transcription_service import transcribe_with_gemini
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +47,38 @@ async def transcribe(
     file: UploadFile = File(...),
     language: str | None = Form(default=None),
 ):
-    """Transcribe an uploaded audio or video file.
+    """Transcribe using Gemini first, with local Whisper as fallback."""
 
-    Proxies to the whisper-service at WHISPER_SERVICE_URL.
-    Returns structured JSON with segments and word-level timestamps.
-    """
+    if settings.GEMINI_API_KEY:
+        try:
+            contents = await file.read()
+
+            if len(contents) > settings.MAX_UPLOAD_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File too large. Maximum size: {settings.MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
+                )
+
+            result = await asyncio.to_thread(
+                transcribe_with_gemini,
+                contents=contents,
+                filename=file.filename or "audio",
+                content_type=file.content_type,
+                language=language,
+            )
+
+            logger.info("Gemini transcription completed for %s", file.filename)
+            return result
+
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception(
+                "Gemini transcription failed for %s; falling back to Whisper",
+                file.filename,
+            )
+            await file.seek(0)
+
     try:
         resp = await _proxy_file_upload(
             settings.WHISPER_SERVICE_URL,
@@ -58,19 +87,24 @@ async def transcribe(
             extra_form={"language": language} if language else {},
         )
         return resp.json()
+
     except httpx.HTTPStatusError as e:
         detail = e.response.text if e.response else str(e)
         raise HTTPException(status_code=e.response.status_code, detail=detail)
+
     except httpx.ConnectError:
-        logger.error("Whisper service unavailable at %s", settings.WHISPER_SERVICE_URL)
+        logger.error(
+            "Whisper service unavailable at %s",
+            settings.WHISPER_SERVICE_URL,
+        )
         raise HTTPException(
             status_code=503,
-            detail="Whisper service is not available. Ensure whisper-service is running.",
+            detail="Gemini failed and Whisper service is not available.",
         )
-    except Exception:
-        logger.exception("Transcription proxy failed")
-        raise HTTPException(status_code=500, detail="Transcription failed.")
 
+    except Exception:
+        logger.exception("Transcription failed")
+        raise HTTPException(status_code=500, detail="Transcription failed.")
 
 # ---------------------------------------------------------------------------
 # Subtitle generation (stays local -- no heavy deps)

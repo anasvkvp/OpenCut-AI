@@ -25,6 +25,7 @@ import { useTranscriptStore } from "@/stores/transcript-store";
 import { useEditor } from "@/hooks/use-editor";
 import { useTextTimelineBridge } from "@/hooks/use-text-timeline-bridge";
 import { useSmartCut } from "@/hooks/use-smart-cut";
+import { useEenokiAutoCut } from "@/hooks/use-eenoki-auto-cut";
 import { DEFAULT_TEXT_ELEMENT } from "@/constants/text-constants";
 import { computeCutsFromDeletedSegments } from "@/lib/text-timeline-sync";
 import { aiClient } from "@/lib/ai-client";
@@ -67,6 +68,13 @@ export function QuickActionsBar({ className }: { className?: string }) {
 	const editor = useEditor();
 	const { handleDeleteSegments } = useTextTimelineBridge();
 	const { runSmartCut } = useSmartCut();
+        const {
+                plan: eenokiAutoCutPlan,
+                analyze: analyzeEenokiAutoCut,
+                applyPlan: applyEenokiAutoCut,
+                isAnalyzing: isEenokiAutoCutAnalyzing,
+                isApplying: isEenokiAutoCutApplying,
+        } = useEenokiAutoCut();
 
 	const [fillerStatus, setFillerStatus] = useState<ActionStatus>("idle");
 	const [fillerCount, setFillerCount] = useState(0);
@@ -347,11 +355,28 @@ export function QuickActionsBar({ className }: { className?: string }) {
 	const handleFindClips = useCallback(() => {
 		useAssetsPanelStore.getState().setActiveTab("audio");
 		toast.info(
-			"Switched to Audio panel — use the Podcast tab to find best clips.",
+			"Switched to Audio panel Ã¢â‚¬â€ use the Podcast tab to find best clips.",
 		);
 		setFindClipsStatus("done");
 	}, []);
 
+        // --- EENOKI Auto Cut (Gemini semantic editing) ---
+        const handleEenokiAutoCut = useCallback(async () => {
+                if (isEenokiAutoCutAnalyzing || isEenokiAutoCutApplying) return;
+
+                if (eenokiAutoCutPlan) {
+                        applyEenokiAutoCut();
+                        return;
+                }
+
+                await analyzeEenokiAutoCut();
+        }, [
+                eenokiAutoCutPlan,
+                analyzeEenokiAutoCut,
+                applyEenokiAutoCut,
+                isEenokiAutoCutAnalyzing,
+                isEenokiAutoCutApplying,
+        ]);
 	// --- Smart Cut (one-click filler + silence removal) ---
 	const handleSmartCut = useCallback(async () => {
 		setSmartCutStatus("running");
@@ -372,6 +397,31 @@ export function QuickActionsBar({ className }: { className?: string }) {
 		silenceStatus === "done" ? silenceCount : currentSilenceCount;
 
 	const actions = [
+                {
+                        id: "eenoki-auto-cut",
+                        label: eenokiAutoCutPlan
+                                ? "Apply AI cut"
+                                : isEenokiAutoCutAnalyzing
+                                        ? "Analyzing..."
+                                        : "EENOKI Auto Cut",
+                        description: eenokiAutoCutPlan
+                                ? `${eenokiAutoCutPlan.decisions.filter(
+                                          (d) =>
+                                                  d.action === "CUT" &&
+                                                  d.confidence >= 0.9,
+                                  ).length} safe cut candidate(s) ready — click to apply`
+                                : "Gemini meaning-based edit: remove retakes, duplicates and filler while preserving technical meaning",
+                        icon: Scissor01Icon,
+                        status: (
+                                isEenokiAutoCutAnalyzing ||
+                                isEenokiAutoCutApplying
+                                        ? "running"
+                                        : eenokiAutoCutPlan
+                                                ? "done"
+                                                : "idle"
+                        ) as ActionStatus,
+                        handler: handleEenokiAutoCut,
+                },
 		{
 			id: "smart-cut",
 			label: smartCutStatus === "done" ? "Cut done" : "Smart cut",
@@ -390,7 +440,7 @@ export function QuickActionsBar({ className }: { className?: string }) {
 						: "Find fillers",
 			description:
 				fillerStatus === "done" && effectiveFillerCount > 0
-					? `${effectiveFillerCount} filler words found — click to remove`
+					? `${effectiveFillerCount} filler words found Ã¢â‚¬â€ click to remove`
 					: currentFillerCount > 0
 						? `${currentFillerCount} filler words detected`
 						: "Scan for filler words (um, uh, like...)",
@@ -435,8 +485,8 @@ export function QuickActionsBar({ className }: { className?: string }) {
 			label: popoverSubCount > 0 ? "Add more subs" : "Popover subs",
 			description:
 				popoverSubCount > 0
-					? `${popoverSubCount} set${popoverSubCount > 1 ? "s" : ""} added — click to add another layer`
-					: "Word-by-word popover subtitles — each word appears when spoken and stays visible",
+					? `${popoverSubCount} set${popoverSubCount > 1 ? "s" : ""} added Ã¢â‚¬â€ click to add another layer`
+					: "Word-by-word popover subtitles Ã¢â‚¬â€ each word appears when spoken and stays visible",
 			icon: ClosedCaptionIcon,
 			count: popoverSubCount > 0 ? popoverSubCount : undefined,
 			status: popoverSubStatus,

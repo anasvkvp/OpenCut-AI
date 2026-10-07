@@ -11,6 +11,8 @@ import {
 import { useEditorActions } from "@/hooks/actions/use-editor-actions";
 import { useEmbeddingIndexer } from "@/hooks/use-embedding-indexer";
 import { prefetchFontAtlas } from "@/lib/fonts/google-fonts";
+import { storageService } from "@/services/storage/service";
+import { useTranscriptStore } from "@/stores/transcript-store";
 
 interface EditorProviderProps {
 	projectId: string;
@@ -79,6 +81,85 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 		};
 	}, [projectId, editor, router]);
 
+        useEffect(() => {
+                if (isLoading || error) return;
+
+                const currentProject = editor.project.getActiveOrNull();
+                if (currentProject?.metadata.id !== projectId) return;
+
+                let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+                const saveCurrentTranscript = async () => {
+                        const state = useTranscriptStore.getState();
+
+                        await storageService.saveTranscript({
+                                projectId,
+                                transcript: {
+                                        segments: state.segments,
+                                        language: state.language,
+                                        duration: state.duration,
+                                        fillers: state.fillers,
+                                        silences: state.silences,
+                                        chapters: state.chapters,
+                                        translations: state.translations,
+                                        speakerNames: state.speakerNames,
+                                        speakerPositions: state.speakerPositions,
+                                        emotions: state.emotions,
+                                },
+                        });
+                };
+
+                const unsubscribe = useTranscriptStore.subscribe(
+                        (state, previousState) => {
+                                const changed =
+                                        state.segments !== previousState.segments ||
+                                        state.language !== previousState.language ||
+                                        state.duration !== previousState.duration ||
+                                        state.fillers !== previousState.fillers ||
+                                        state.silences !== previousState.silences ||
+                                        state.chapters !== previousState.chapters ||
+                                        state.translations !== previousState.translations ||
+                                        state.speakerNames !== previousState.speakerNames ||
+                                        state.speakerPositions !== previousState.speakerPositions ||
+                                        state.emotions !== previousState.emotions;
+
+                                if (!changed) return;
+
+                                if (saveTimer) clearTimeout(saveTimer);
+
+                                saveTimer = setTimeout(() => {
+                                        void saveCurrentTranscript().catch((saveError) => {
+                                                console.error(
+                                                        "Failed to save project transcript:",
+                                                        saveError,
+                                                );
+                                        });
+                                }, 500);
+                        },
+                );
+
+                void saveCurrentTranscript().catch((saveError) => {
+                        console.error(
+                                "Failed to save project transcript:",
+                                saveError,
+                        );
+                });
+
+                return () => {
+                        unsubscribe();
+
+                        if (saveTimer) {
+                                clearTimeout(saveTimer);
+                        }
+
+                        void saveCurrentTranscript().catch((saveError) => {
+                                console.error(
+                                        "Failed to save project transcript:",
+                                        saveError,
+                                );
+                        });
+                };
+        }, [projectId, isLoading, error, editor]);
 	if (error) {
 		return (
 			<div className="bg-background flex h-screen w-screen items-center justify-center">

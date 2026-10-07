@@ -64,9 +64,9 @@ export interface ServicesStatus {
 	active_model: string | null;
 }
 
-const HEALTH_TIMEOUT_MS = 5_000;
-const REQUEST_TIMEOUT_MS = 120_000;
-const LLM_TIMEOUT_MS = 600_000; // 10 min — LLM generation can be slow on CPU
+const HEALTH_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 600_000;
+const LLM_TIMEOUT_MS = 600_000; // 10 min Ã¢â‚¬â€ LLM generation can be slow on CPU
 
 export class AIClientError extends Error {
 	readonly errorType: AIErrorType;
@@ -343,7 +343,7 @@ class AIClient {
 			);
 		}
 
-		// Check content type — if it's regular JSON, the backend is old (no streaming)
+		// Check content type Ã¢â‚¬â€ if it's regular JSON, the backend is old (no streaming)
 		const contentType = response.headers.get("content-type") || "";
 		if (contentType.includes("application/json")) {
 			return response.json() as Promise<T>;
@@ -482,6 +482,42 @@ class AIClient {
 		);
 	}
 
+        async eenokiAutoCutPlan(
+                segments: Array<{
+                        id: string | number;
+                        text: string;
+                        start: number;
+                        end: number;
+                }>,
+                objective?: string,
+        ): Promise<{
+                decisions: Array<{
+                        segment_id: string;
+                        action: "KEEP" | "CUT" | "REVIEW";
+                        reason: string;
+                        confidence: number;
+                }>;
+                cut_ranges: Array<{
+                        segment_id: string;
+                        start: number;
+                        end: number;
+                        reason: string;
+                        confidence: number;
+                }>;
+                summary: string;
+        }> {
+                return this.request(
+                        "/api/eenoki/auto-cut/plan",
+                        {
+                                method: "POST",
+                                body: JSON.stringify({
+                                        segments,
+                                        ...(objective ? { objective } : {}),
+                                }),
+                        },
+                        LLM_TIMEOUT_MS,
+                );
+        }
 	async analyzeFillers(
 		file: File,
 		fillerWords?: string,
@@ -585,7 +621,7 @@ class AIClient {
 		);
 	}
 
-	// ── Video background removal (per-frame rembg) ────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Video background removal (per-frame rembg) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/**
 	 * Start a per-frame background-removal job on a video clip. Returns a
@@ -623,7 +659,7 @@ class AIClient {
 		return `${this.baseUrl}${path}`;
 	}
 
-	// ── Auto B-roll (CLIP-powered) ────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Auto B-roll (CLIP-powered) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/**
 	 * Index a media asset for B-roll: samples frames, embeds them via the
@@ -728,7 +764,7 @@ class AIClient {
 	}
 
 	/**
-	 * Streaming chat — tokens arrive via newline-delimited JSON.
+	 * Streaming chat Ã¢â‚¬â€ tokens arrive via newline-delimited JSON.
 	 * Calls `onToken` for each token as it arrives, preventing timeouts.
 	 * Falls back to non-streaming /api/llm/chat if the stream endpoint is unavailable (404).
 	 * Returns the full accumulated response when done.
@@ -855,7 +891,7 @@ class AIClient {
 
 	/**
 	 * Batch-translate many texts in one request via the local NLLB-200
-	 * service. Order is preserved. Cheaper than N calls — ideal for dubbing
+	 * service. Order is preserved. Cheaper than N calls Ã¢â‚¬â€ ideal for dubbing
 	 * a whole transcript before TTS.
 	 */
 	async nllbTranslateBatch(
@@ -891,7 +927,7 @@ class AIClient {
 		}
 	}
 
-	// ── Sarvam AI (Indian Languages) ──────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Sarvam AI (Indian Languages) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	async sarvamTranscribe(
 		file: File,
@@ -1045,7 +1081,7 @@ class AIClient {
 		);
 	}
 
-	// ── Smallest AI (Waves — Lightning TTS + Pulse STT) ─────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Smallest AI (Waves Ã¢â‚¬â€ Lightning TTS + Pulse STT) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	async smallestTTS(
 		text: string,
@@ -1432,7 +1468,7 @@ class AIClient {
 	}
 
 	/** Fallback for videos the browser can't decode client-side (e.g. ProRes
-	 * 4444 alpha .mov — no browser ships a ProRes decoder). Re-encodes to a
+	 * 4444 alpha .mov Ã¢â‚¬â€ no browser ships a ProRes decoder). Re-encodes to a
 	 * WebM VP9 alpha stream the preview/export pipeline can actually play. */
 	async transcodeAlphaVideo(file: File): Promise<Blob> {
 		const url = `${this.baseUrl}/api/video/transcode-alpha`;
@@ -1478,7 +1514,7 @@ class AIClient {
 		});
 	}
 
-	// ── Reel Templates ───────────────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Reel Templates Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	async generateReelTemplate(
 		topic: string,
@@ -1536,11 +1572,11 @@ class AIClient {
 		if (contentType.includes("application/json")) {
 			const data = await response.json();
 			if (data.job_id) return data;
-			// Old backend returned full template as JSON — wrap it
+			// Old backend returned full template as JSON Ã¢â‚¬â€ wrap it
 			return { job_id: "__direct__", status: "completed", result: data as ReelTemplate };
 		}
 
-		// Old backend with streaming (NDJSON) — read the stream and extract result
+		// Old backend with streaming (NDJSON) Ã¢â‚¬â€ read the stream and extract result
 		if (response.body) {
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
@@ -1593,7 +1629,7 @@ class AIClient {
 		return this.request("/api/template/jobs");
 	}
 
-	// ── TurboQuant Optimization ───────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ TurboQuant Optimization Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	async turboquantStatus(): Promise<TurboQuantStatus> {
 		return this.request<TurboQuantStatus>(
@@ -1680,7 +1716,7 @@ class AIClient {
 		});
 	}
 
-	// ── TurboQuant Multi-Model Management ─────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ TurboQuant Multi-Model Management Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	async turboquantListModels(): Promise<TQModelsResponse> {
 		return this.request<TQModelsResponse>("/api/turboquant/models");
@@ -1745,7 +1781,7 @@ class AIClient {
 				method: "POST",
 				body: JSON.stringify({ model_id: modelId }),
 			},
-			300_000, // 5 min — model loading on CPU can be slow
+			300_000, // 5 min Ã¢â‚¬â€ model loading on CPU can be slow
 		);
 	}
 
@@ -1761,7 +1797,7 @@ class AIClient {
 		});
 	}
 
-	// ── Video Generation ─────────────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Video Generation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/** Generate a video prompt from a template description using the LLM. */
 	async generateVideoPrompt(
@@ -1791,7 +1827,7 @@ class AIClient {
 		});
 	}
 
-	// ── YouTube to Reels ─────────────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ YouTube to Reels Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/** Ingest a YouTube video: validate, fetch metadata, start audio download. */
 	async youtubeIngest(
@@ -1851,7 +1887,7 @@ class AIClient {
 		});
 	}
 
-	// ── Engagement Scoring ───────────────────────────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Engagement Scoring Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/** Score a single clip's engagement potential. */
 	async engagementScore(
@@ -1919,7 +1955,7 @@ class AIClient {
 		return this.requestWithKeepalive(`/api/engagement/score-analytics?${params.toString()}`);
 	}
 
-	// ── Visual / Semantic Search (CLIP embeddings) ────────────────────
+	// Ã¢â€â‚¬Ã¢â€â‚¬ Visual / Semantic Search (CLIP embeddings) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 	/** Embed a natural-language query into a 512-dim L2-normalized vector. */
 	async embedText(query: string): Promise<EmbedTextResult> {
@@ -1961,7 +1997,7 @@ class AIClient {
 	}
 }
 
-// ── YouTube / Engagement types ──────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ YouTube / Engagement types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface YouTubeVideoMeta {
 	video_id: string;
@@ -2085,7 +2121,7 @@ export interface ScoreAnalyticsResponse {
 	weakest_signal: string;
 }
 
-// ── Visual / Semantic Search types ─────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Visual / Semantic Search types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface EmbedTextResult {
 	vector: number[];
@@ -2129,7 +2165,7 @@ export interface ClipServiceHealthResult {
 	error?: string;
 }
 
-// ── Video background-removal job status ──────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Video background-removal job status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface VideoBgResult {
 	videoUrl: string;
@@ -2152,7 +2188,7 @@ export interface VideoBgJobStatus {
 	error: string | null;
 }
 
-// ── Auto B-roll (CLIP embeddings) ────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Auto B-roll (CLIP embeddings) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface BRollFrameVector {
 	timestamp: number;

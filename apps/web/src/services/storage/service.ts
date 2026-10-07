@@ -15,7 +15,25 @@ import {
 	runStorageMigrations,
 } from "@/services/storage/migrations";
 import type { Bookmark, TimelineTrack, TScene } from "@/types/timeline";
+import type { TranscriptionSegment, EmotionSegment, FillerWord, SilenceRegion, Chapter } from "@/types/ai";
 
+
+export interface ProjectTranscriptData {
+        segments: TranscriptionSegment[];
+        language: string;
+        duration: number;
+        fillers: FillerWord[];
+        silences: SilenceRegion[];
+        chapters: Chapter[];
+        translations: Array<{
+                languageCode: string;
+                languageName: string;
+                segments: TranscriptionSegment[];
+        }>;
+        speakerNames: Record<string, string>;
+        speakerPositions: Record<string, "left" | "right" | "center">;
+        emotions: EmotionSegment[];
+}
 const MIME_TYPES: Record<string, string> = {
 	".mp4": "video/mp4",
 	".webm": "video/webm",
@@ -71,6 +89,7 @@ function normalizeBookmarks({ raw }: { raw: unknown }): Bookmark[] {
 class StorageService {
 	private projectsAdapter: IndexedDBAdapter<SerializedProject>;
 	private savedSoundsAdapter: IndexedDBAdapter<SavedSoundsData>;
+        private transcriptsAdapter: IndexedDBAdapter<ProjectTranscriptData>;
 	private config: StorageConfig;
 	private migrationsPromise: Promise<void> | null = null;
 
@@ -93,6 +112,12 @@ class StorageService {
 			"saved-sounds",
 			this.config.version,
 		);
+
+                this.transcriptsAdapter = new IndexedDBAdapter<ProjectTranscriptData>(
+                        "video-editor-transcripts",
+                        "transcripts",
+                        1,
+                );
 	}
 
 	private async ensureMigrations(): Promise<void> {
@@ -217,6 +242,31 @@ class StorageService {
 		return { project };
 	}
 
+        async saveTranscript({
+                projectId,
+                transcript,
+        }: {
+                projectId: string;
+                transcript: ProjectTranscriptData;
+        }): Promise<void> {
+                await this.transcriptsAdapter.set(projectId, transcript);
+        }
+
+        async loadTranscript({
+                projectId,
+        }: {
+                projectId: string;
+        }): Promise<ProjectTranscriptData | null> {
+                return this.transcriptsAdapter.get(projectId);
+        }
+
+        async removeTranscript({
+                projectId,
+        }: {
+                projectId: string;
+        }): Promise<void> {
+                await this.transcriptsAdapter.remove(projectId);
+        }
 	async loadAllProjects(): Promise<TProject[]> {
 		const projectIds = await this.projectsAdapter.list();
 		const projects: TProject[] = [];
@@ -307,7 +357,7 @@ class StorageService {
 
 		if (!file || !metadata) return null;
 
-		// OPFS loses the original filename and MIME type — reconstruct from metadata
+		// OPFS loses the original filename and MIME type ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â reconstruct from metadata
 		const restoredFile =
 			file.name === metadata.name && file.type
 				? file

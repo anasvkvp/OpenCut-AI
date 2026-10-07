@@ -92,6 +92,7 @@ services:
       - OPENCUTAI_AI_MODEL_TIER=${AI_MODEL_TIER:-auto}
       - OPENCUTAI_KV_CACHE_BITS=${KV_CACHE_BITS:-4}
       - OPENCUTAI_AI_LLM_BACKEND=${AI_LLM_BACKEND:-auto}
+      - OPENCUTAI_GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENCUTAI_SARVAM_API_KEY=${SARVAM_API_KEY:-}
     volumes:
       - ai_models:/app/models
@@ -262,7 +263,7 @@ services:
       - MODEL_NAME=${TURBOQUANT_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
       - KV_CACHE_BITS=${KV_CACHE_BITS:-4}
       - MAX_CONTEXT_LENGTH=8192
-      # Compute mode is driven by the user-facing toggle in Settings → AI Optimization.
+      # Compute mode is driven by the user-facing toggle in Settings â†’ AI Optimization.
       # The ai-backend writes OPENCUTAI_AI_COMPUTE_MODE to .env; this line pulls it
       # through so `auto | cpu | cuda` reaches the turboquant-service at container start.
       - DEVICE=${OPENCUTAI_AI_COMPUTE_MODE:-auto}
