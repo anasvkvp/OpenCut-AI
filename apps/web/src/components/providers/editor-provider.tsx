@@ -24,6 +24,7 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+        const [transcriptReadyProjectId, setTranscriptReadyProjectId] = useState<string | null>(null);
 	const { disableKeybindings, enableKeybindings } = useKeybindingDisabler();
 	const activeProject = editor.project.getActiveOrNull();
 
@@ -40,13 +41,53 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 
 		const loadProject = async () => {
 			try {
-				setIsLoading(true);
-				await editor.project.loadProject({ id: projectId });
+                                setIsLoading(true);
+                                setTranscriptReadyProjectId(null);
 
-				if (cancelled) return;
+                                await editor.project.loadProject({ id: projectId });
 
-				setIsLoading(false);
-				prefetchFontAtlas();
+                                if (cancelled) return;
+
+                                try {
+                                        const savedTranscript =
+                                                await storageService.loadTranscript({
+                                                        projectId,
+                                                });
+
+                                        if (cancelled) return;
+
+                                        if (savedTranscript) {
+                                                useTranscriptStore.setState({
+                                                        segments: savedTranscript.segments ?? [],
+                                                        language: savedTranscript.language ?? "auto",
+                                                        duration: savedTranscript.duration ?? 0,
+                                                        fillers: savedTranscript.fillers ?? [],
+                                                        silences: savedTranscript.silences ?? [],
+                                                        chapters: savedTranscript.chapters ?? [],
+                                                        translations: savedTranscript.translations ?? [],
+                                                        speakerNames: savedTranscript.speakerNames ?? {},
+                                                        speakerPositions: savedTranscript.speakerPositions ?? {},
+                                                        emotions: savedTranscript.emotions ?? [],
+                                                        selectedSegmentIds: new Set<number>(),
+                                                        isTranscribing: false,
+                                                        progress: 0,
+                                                });
+                                        } else {
+                                                useTranscriptStore.getState().reset();
+                                        }
+                                } catch (transcriptError) {
+                                        console.error(
+                                                "Failed to restore project transcript:",
+                                                transcriptError,
+                                        );
+                                        throw new Error("Transcript loading failed. Editing blocked to protect saved data.");
+                                }
+
+                                if (cancelled) return;
+
+                                setTranscriptReadyProjectId(projectId);
+                                setIsLoading(false);
+                                prefetchFontAtlas();
 			} catch (err) {
 				if (cancelled) return;
 
@@ -82,30 +123,45 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 	}, [projectId, editor, router]);
 
         useEffect(() => {
-                if (isLoading || error) return;
+                if (
+                        isLoading ||
+                        error ||
+                        transcriptReadyProjectId !== projectId
+                ) {
+                        return;
+                }
 
                 const currentProject = editor.project.getActiveOrNull();
                 if (currentProject?.metadata.id !== projectId) return;
 
                 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+                let pendingTranscript: Parameters<
+                        typeof storageService.saveTranscript
+                >[0]["transcript"] | null = null;
 
-                const saveCurrentTranscript = async () => {
+                const buildTranscriptSnapshot = () => {
                         const state = useTranscriptStore.getState();
 
+                        return {
+                                segments: state.segments,
+                                language: state.language,
+                                duration: state.duration,
+                                fillers: state.fillers,
+                                silences: state.silences,
+                                chapters: state.chapters,
+                                translations: state.translations,
+                                speakerNames: state.speakerNames,
+                                speakerPositions: state.speakerPositions,
+                                emotions: state.emotions,
+                        };
+                };
+
+                const persist = async (
+                        transcript: ReturnType<typeof buildTranscriptSnapshot>,
+                ) => {
                         await storageService.saveTranscript({
                                 projectId,
-                                transcript: {
-                                        segments: state.segments,
-                                        language: state.language,
-                                        duration: state.duration,
-                                        fillers: state.fillers,
-                                        silences: state.silences,
-                                        chapters: state.chapters,
-                                        translations: state.translations,
-                                        speakerNames: state.speakerNames,
-                                        speakerPositions: state.speakerPositions,
-                                        emotions: state.emotions,
-                                },
+                                transcript,
                         });
                 };
 
@@ -125,10 +181,17 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 
                                 if (!changed) return;
 
+                                pendingTranscript = buildTranscriptSnapshot();
+
                                 if (saveTimer) clearTimeout(saveTimer);
 
                                 saveTimer = setTimeout(() => {
-                                        void saveCurrentTranscript().catch((saveError) => {
+                                        if (!pendingTranscript) return;
+
+                                        const snapshot = pendingTranscript;
+                                        pendingTranscript = null;
+
+                                        void persist(snapshot).catch((saveError) => {
                                                 console.error(
                                                         "Failed to save project transcript:",
                                                         saveError,
@@ -138,13 +201,6 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
                         },
                 );
 
-                void saveCurrentTranscript().catch((saveError) => {
-                        console.error(
-                                "Failed to save project transcript:",
-                                saveError,
-                        );
-                });
-
                 return () => {
                         unsubscribe();
 
@@ -152,15 +208,23 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
                                 clearTimeout(saveTimer);
                         }
 
-                        void saveCurrentTranscript().catch((saveError) => {
-                                console.error(
-                                        "Failed to save project transcript:",
-                                        saveError,
-                                );
-                        });
+                        if (pendingTranscript) {
+                                void persist(pendingTranscript).catch((saveError) => {
+                                        console.error(
+                                                "Failed to save project transcript:",
+                                                saveError,
+                                        );
+                                });
+                        }
                 };
-        }, [projectId, isLoading, error, editor]);
-	if (error) {
+        }, [
+                projectId,
+                isLoading,
+                error,
+                editor,
+                transcriptReadyProjectId,
+        ]);
+        if (error) {
 		return (
 			<div className="bg-background flex h-screen w-screen items-center justify-center">
 				<div className="flex flex-col items-center gap-4">

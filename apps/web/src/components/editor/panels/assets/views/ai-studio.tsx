@@ -493,7 +493,7 @@ export function AIStudioView() {
 						</Badge>
 					)}
 				</div>
-				<div className="flex items-center gap-1">
+				<div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap pl-2 [&>button]:shrink-0">
 					{(mode === "chat" || mode === "transcript") && messages.length > 0 && (
 						<Button
 							variant="ghost"
@@ -553,17 +553,15 @@ export function AIStudioView() {
 							B-Roll
 						</Button>
 					)}
-					{hasTranscript && (
-						<Button
-							variant={mode === "auto-broll" ? "secondary" : "ghost"}
-							size="sm"
-							className="h-6 text-[10px] px-2"
-							onClick={() => setMode("auto-broll")}
-						>
-							Auto B-Roll
-						</Button>
-					)}
-					{hasTranscript && (
+                                        <Button
+                                                variant={mode === "auto-broll" ? "secondary" : "ghost"}
+                                                size="sm"
+                                                className="h-6 text-[10px] px-2"
+                                                onClick={() => setMode("auto-broll")}
+                                        >
+                                                Auto B-Roll
+                                        </Button>
+                                        {hasTranscript && (
 						<Button
 							variant={mode === "edit-speaker" ? "secondary" : "ghost"}
 							size="sm"

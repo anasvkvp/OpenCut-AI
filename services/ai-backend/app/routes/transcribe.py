@@ -6,6 +6,9 @@ Subtitle generation remains local (no heavy dependencies).
 
 import asyncio
 import logging
+import os
+import tempfile
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -13,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.services.gemini_transcription_service import transcribe_with_gemini
+from app.services.audio_service import extract_audio
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +63,72 @@ async def transcribe(
                     detail=f"File too large. Maximum size: {settings.MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
                 )
 
-            result = await asyncio.to_thread(
-                transcribe_with_gemini,
-                contents=contents,
-                filename=file.filename or "audio",
-                content_type=file.content_type,
-                language=language,
+            filename = file.filename or "media"
+            content_type = file.content_type or "application/octet-stream"
+            suffix = Path(filename).suffix.lower()
+
+            video_extensions = {
+                ".mp4",
+                ".mov",
+                ".mkv",
+                ".avi",
+                ".m4v",
+                ".webm",
+            }
+
+            is_video = (
+                content_type.startswith("video/")
+                or suffix in video_extensions
             )
+
+            temp_video_path = None
+            extracted_audio_path = None
+
+            try:
+                if is_video:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False,
+                        suffix=suffix or ".mp4",
+                    ) as temp_video:
+                        temp_video.write(contents)
+                        temp_video_path = temp_video.name
+
+                    extracted_audio_path = await extract_audio(temp_video_path)
+                    audio_contents = Path(extracted_audio_path).read_bytes()
+
+                    gemini_contents = audio_contents
+                    gemini_filename = f"{Path(filename).stem}.wav"
+                    gemini_content_type = "audio/wav"
+
+                    logger.info(
+                        "Extracted audio for Gemini transcription: %s -> %s",
+                        filename,
+                        gemini_filename,
+                    )
+                else:
+                    gemini_contents = contents
+                    gemini_filename = filename
+                    gemini_content_type = content_type
+
+                result = await asyncio.to_thread(
+                    transcribe_with_gemini,
+                    contents=gemini_contents,
+                    filename=gemini_filename,
+                    content_type=gemini_content_type,
+                    language=language,
+                )
+            finally:
+                for cleanup_path in (temp_video_path, extracted_audio_path):
+                    if cleanup_path:
+                        try:
+                            os.remove(cleanup_path)
+                        except FileNotFoundError:
+                            pass
+                        except OSError:
+                            logger.warning(
+                                "Could not remove temporary transcription file: %s",
+                                cleanup_path,
+                            )
 
             logger.info("Gemini transcription completed for %s", file.filename)
             return result

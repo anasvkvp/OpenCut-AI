@@ -125,23 +125,6 @@ function EditorLayout() {
 		}
 	}, [editor]);
 
-	// Clear transcript when all video/audio elements are removed (any deletion path)
-	useEffect(() => {
-		return editor.timeline.subscribe(() => {
-			const { segments } = useTranscriptStore.getState();
-			if (segments.length === 0) return;
-
-			const tracks = editor.timeline.getTracks();
-			const hasMedia = tracks.some(
-				(t) =>
-					(t.type === "video" || t.type === "audio") &&
-					t.elements.length > 0,
-			);
-			if (!hasMedia) {
-				useTranscriptStore.getState().reset();
-			}
-		});
-	}, [editor]);
 
 	return (
 		<ResizablePanelGroup

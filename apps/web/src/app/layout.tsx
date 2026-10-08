@@ -29,7 +29,9 @@ export default function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
-				<BotIdClient protect={protectedRoutes} />
+				{process.env.NODE_ENV !== "development" && (
+                                        <BotIdClient protect={protectedRoutes} />
+                                )}
 				<JsonLd />
 				<GoogleAnalytics />
 				{process.env.NODE_ENV === "development" && (

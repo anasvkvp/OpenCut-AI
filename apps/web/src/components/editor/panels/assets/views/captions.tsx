@@ -30,6 +30,7 @@ import type { TranscriptionResult } from "@/types/ai";
 import { Spinner } from "@/components/ui/spinner";
 import { Label } from "@/components/ui/label";
 import { useTranscriptStore } from "@/stores/transcript-store";
+import { storageService } from "@/services/storage/service";
 import { getElementsAtTime, hasMediaId } from "@/lib/timeline";
 import { toast } from "sonner";
 import { aiClient } from "@/lib/ai-client";
@@ -362,8 +363,43 @@ export function Captions() {
 					}),
 			}));
 
-			useTranscriptStore.getState().setSegments(transcriptSegments);
-			useTranscriptStore.getState().setLanguage(result.language ?? "en");
+                        useTranscriptStore.getState().setSegments(transcriptSegments);
+                        useTranscriptStore.getState().setLanguage(result.language ?? "en");
+
+                        try {
+                                const activeProject = editor.project.getActiveOrNull();
+
+                                if (activeProject) {
+                                        const transcriptState = useTranscriptStore.getState();
+
+                                        await storageService.saveTranscript({
+                                                projectId: activeProject.metadata.id,
+                                                transcript: {
+                                                        segments: transcriptState.segments,
+                                                        language: transcriptState.language,
+                                                        duration: transcriptState.duration,
+                                                        fillers: transcriptState.fillers,
+                                                        silences: transcriptState.silences,
+                                                        chapters: transcriptState.chapters,
+                                                        translations: transcriptState.translations,
+                                                        speakerNames: transcriptState.speakerNames,
+                                                        speakerPositions: transcriptState.speakerPositions,
+                                                        emotions: transcriptState.emotions,
+                                                },
+                                        });
+
+                                        console.info(
+                                                "Transcript saved for project:",
+                                                activeProject.metadata.id,
+                                                transcriptState.segments.length,
+                                        );
+                                }
+                        } catch (saveError) {
+                                console.error(
+                                        "Failed to save transcript immediately:",
+                                        saveError,
+                                );
+                        }
 
 			// ── Auto Speaker Diarization + Emotion Detection ──
 			// Run both in parallel: speaker labels and emotion annotations.

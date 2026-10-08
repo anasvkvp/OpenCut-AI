@@ -72,6 +72,7 @@ export function useAutoBRoll() {
 	} | null>(null);
 	const [result, setResult] = useState<AutoBRollResult | null>(null);
 	const embeddingsRef = useRef<MediaEmbedding[]>([]);
+	const brollTrackIdRef = useRef<string | null>(null);
 
 	const indexAsset = useCallback(
 		async (mediaId: string) => {
@@ -142,13 +143,12 @@ export function useAutoBRoll() {
 		(match: BRollMatch, start: number, end: number) => {
 			const asset = editor.media.getAssets().find((a) => a.id === match.mediaId);
 			if (!asset) return;
-			// Place on a dedicated B-roll track above the timeline.
+			// Reuse one dedicated B-roll track for all matches.
 			const tracks = editor.timeline.getTracks();
-			let brollTrackId = tracks.find(
-				(t) => t.type === "video" && t.id.startsWith("broll-"),
-			)?.id;
-			if (!brollTrackId) {
+			let brollTrackId = brollTrackIdRef.current;
+			if (!brollTrackId || !tracks.some((t) => t.id === brollTrackId)) {
 				brollTrackId = editor.timeline.addTrack({ type: "video" });
+				brollTrackIdRef.current = brollTrackId;
 			}
 			const baseTransform = { scale: 1, position: { x: 0, y: 0 }, rotate: 0 };
 			if (asset.type === "video") {
